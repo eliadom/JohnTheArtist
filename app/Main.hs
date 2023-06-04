@@ -1,4 +1,6 @@
 module Main where
+import Artist
 
 main :: IO ()
-main = putStrLn "Hello, Haskell!"
+main = do
+  putStrLn "Hello, Haskell!"

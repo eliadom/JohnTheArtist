@@ -1,7 +1,9 @@
 module UdGraphic (
     Comanda(..),
     Distancia,
-    Angle
+    Angle,
+    execute,
+    display
     )
     where
 
@@ -60,6 +62,7 @@ sizeToPoint (Size x y) = Pnt (fromIntegral x) (fromIntegral y)
 
 data Llapis = Color' GL.GLfloat GL.GLfloat GL.GLfloat
             | Transparent
+            | Inkless
             deriving (Eq, Ord, Show)
 
 pencilToRGB :: Llapis -> GL.Color3 GL.GLfloat
@@ -78,6 +81,10 @@ blau    = Color' 0.0 0.0 1.0
 data Ln = Ln Llapis Pnt Pnt
   deriving (Eq,Ord,Show)
 
+-- Estat actual
+
+data Act = Act Pnt Angle
+  deriving (Eq)
 
 -- Window parameters
 
@@ -138,14 +145,56 @@ type Distancia = Float
 data Comanda   = Avança Distancia
                | Gira Angle
                | Comanda :#: Comanda
+               | Para
+               | CanviaColor Llapis
+               | Branca Comanda
+               deriving (Show, Eq)
+
+data Branca = Comanda
+
 
 
 -- Problema 8
 -- Pas de comandes a lines a pintar per GL graphics
 
-execute :: Comanda -> [Ln]
-execute c  =  undefined
+separa :: Comanda -> [Comanda]
+separa (x :#: xs) = (separa x) ++ (separa xs) -- l'unic element que hi passem es la llista de comandes
+separa (Para) = [] -- en cas que sigui un Para, no fem res
+separa (comanda) = [comanda] -- altrament retornem la mateixa comanda
 
+execute :: Comanda -> [Ln]
+execute comanda = execute' (Act (Pnt 0 0) 0) comandesNoves
+  where comandesNoves = separa comanda
+
+execute' :: Act -> [Comanda] -> [Ln]
+
+execute' (Act puntIni angleIni) ((CanviaColor l) : resta) = Ln l puntIni puntIni : (execute' (Act puntIni angleIni) resta)
+
+execute' (Act puntIni angleIni) ((Branca c):resta) = ((Ln negre puntIni puntIni) : (execute' (Act puntFinal angleFinal) comandesBranca)) ++ (execute' (Act puntIni angleIni) resta)
+  where 
+    comandesBranca = separa c
+    (Act puntFinal angleFinal) = fesMoviment (Act puntIni angleIni) (c)
+
+-- Cas: avança, mostrem el progres
+execute' (Act puntIni angleIni) ((Avança a): resta) = Ln negre puntIni puntFinal : execute' (Act puntFinal angleFinal) resta
+ where (Act puntFinal angleFinal) = fesMoviment (Act puntIni angleIni) (Avança a)
+  
+-- Cas: no avança, fem progres i no mostrem
+execute' (Act puntIni angleIni) (c: restacom) = execute' (Act puntFinal angleFinal) restacom
+ where (Act puntFinal angleFinal) = fesMoviment (Act puntIni angleIni) c
+ 
+
+
+-- Cas base
+execute' (Act _ _) [] = []
+
+-- FUNCIO fesMoviment
+-- Donat un punt, un angle i una comanda, retorna nou punt i angle un cop aplicada la comanda
+fesMoviment :: Act -> Comanda -> Act
+fesMoviment (Act (Pnt x y) angle) (Gira angleNou) = Act (Pnt x y) (angle+angleNou)
+fesMoviment (Act (Pnt x y) angle) (Avança dist) = 
+  Act (Pnt (x + dist*(cos (angle* (-pi/180)))) ((y + dist*(sin (angle* (-pi/180)))))) angle
+fesMoviment act para = act
 
 -- Rescales all points in a list of lines
 --  from an arbitrary scale
